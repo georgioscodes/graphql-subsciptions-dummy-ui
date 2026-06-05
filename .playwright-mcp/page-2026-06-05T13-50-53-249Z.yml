@@ -1,0 +1,25 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]: Gigya token
+      - textbox "Paste Gigya token..." [ref=e5]: eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6IlJFUTBNVVE1TjBOQ1JUSkVNemszTTBVMVJrTkRRMFUwUTBNMVJFRkJSamhETWpkRU5VRkJRZyJ9.eyJpc3MiOiJodHRwczovL2ZpZG0uZ2lneWEuY29tL2p3dC80X01YU3RDRnN1dGxKaWFtX3Qwa0MxZHcvIiwiYXBpS2V5IjoiNF9NWFN0Q0ZzdXRsSmlhbV90MGtDMWR3IiwiaWF0IjoxNzgwNjY3MTk1LCJleHAiOjE3ODA2Njc0OTUsInN1YiI6Ijg5YTJmMmRjMmRjMjQ5NGJiNDZiZjY0MjlmNjAwNDA1IiwiZmlyc3ROYW1lIjoiT3duZXIiLCJsYXN0TmFtZSI6Ik93bmVyIiwiZ2VuZGVyIjoidSIsImJpcnRoRGF5Ijo3LCJiaXJ0aE1vbnRoIjo5LCJiaXJ0aFllYXIiOjE5ODEsImVtYWlsIjoib3duZXI1MTJAbWFpbGRyb3AuY2MiLCJkYXRhIjp7Im1nYSI6eyJidXNpbmVzc0VtYWlsIjoib3duZXI1MTJAbWFpbGRyb3AuY2MiLCJjb21wYW55TmFtZSI6IlNTRCBMSU1JVEVEIiwicHJlUHJvZFNpZ25VcENvbXBsZXRlIjoidHJ1ZSIsImRldlNpZ25VcENvbXBsZXRlIjoidHJ1ZSIsImpvYlJvbGUiOiJPd25lciIsImJ1c2luZXNzUGhvbmUiOiIwNzQ5MTgwMDAwMCIsInFhU2lnblVwQ29tcGxldGUiOiJ0cnVlIiwiYnJhbmQiOiJTU0QgTElNSVRFRCIsImNhdGVnb3J5SWQiOiJPQy0wMDAzNjEifX0sImlzVmVyaWZpZWQiOnRydWUsIlVJRCI6Ijg5YTJmMmRjMmRjMjQ5NGJiNDZiZjY0MjlmNjAwNDA1IiwibG9naW5JRHMiOnsiZW1haWxzIjpbIm93bmVyNTEyQG1haWxkcm9wLmNjIl0sInVudmVyaWZpZWRFbWFpbHMiOltdfX0.UUk_UQdXsOFGuVORwgxhejSATIb5lkKX5tHB2OG_azoioRE-t-xEEwWvTFD4_KCGMOUDEZH4J_0GNDLlY7rNj5bSvV64piwLmZ-zZT_wapNodSJlyU5IRPGU7giIcGPTbtg8GTzGaA6gstwSizrZ4OM3IBHEq1dAXhOd0z1U398X-bn8Fbg4OxzkIZvtC6VjY2Bp8QbhKzvF69cxgfb1Zyl77UPplj3rk2_vdEIMy-oTp2odVz7bLXoL_TCbVvsnWzexaRixOmxEwcv57JHGYni6BY4_S195RIJQ7t1T46_9RlqF9uYtg62T5AC7iSacV7k9OEJubtviTxCZDsbYPA
+      - generic [ref=e31]: "session: 789b0fd4…"
+      - button "Reset" [ref=e6]
+    - generic [ref=e37]: "Stream error: Subscription error [INTERNAL_ERROR]"
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - generic [ref=e9]: Chat
+        - generic [ref=e10]:
+          - generic [ref=e33]: Plan an outdoor campaign in London
+          - generic [ref=e35]: ▋
+        - generic [ref=e11]:
+          - textbox "Type a message…" [ref=e30]
+          - button "Send" [disabled] [ref=e38]
+      - generic [ref=e14]:
+        - generic [ref=e15]:
+          - generic [ref=e16]: Frame stream
+          - button "clear" [ref=e17]
+        - generic [ref=e19]: Frames will appear here when streaming starts
+  - button "Open Next.js Dev Tools" [ref=e25] [cursor=pointer]:
+    - img [ref=e26]
+  - alert [ref=e29]
