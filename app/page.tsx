@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "graphql-ws";
 
-const GQL_HTTP = process.env.NEXT_PUBLIC_GQL_HTTP ?? "http://localhost:9666/graphql";
-const GQL_WS = process.env.NEXT_PUBLIC_GQL_WS ?? "ws://localhost:9666/subscriptions";
+const GQL_HTTP = process.env.NEXT_PUBLIC_GQL_HTTP ?? "https://api.dev.adpower.com/graphql";
+const GQL_WS = process.env.NEXT_PUBLIC_GQL_WS ?? "wss://api.dev.adpower.com/subscriptions";
 
 const CREATE_SESSION = `
   mutation CreateSession($input: CreateAiPlannerSessionInput) {
