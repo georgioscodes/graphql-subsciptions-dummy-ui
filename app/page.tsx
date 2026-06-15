@@ -6,32 +6,53 @@ import { createClient } from "graphql-ws";
 const GQL_HTTP = process.env.NEXT_PUBLIC_GQL_HTTP ?? "https://api.dev.adpower.com/graphql";
 const GQL_WS = process.env.NEXT_PUBLIC_GQL_WS ?? "wss://api.dev.adpower.com/subscriptions";
 
+// MGA-6715 removed the input argument — brand data is now resolved server-side from account-service.
 const CREATE_SESSION = `
-  mutation CreateSession($input: CreateAiPlannerSessionInput) {
-    createAiPlannerSession(input: $input) {
+  mutation CreateSession {
+    createAiPlannerSession {
       sessionId
       flow
     }
   }
 `;
 
+// Public (unauthed) counterpart — no input, no Authorization header. MGA-6792.
+const CREATE_PUBLIC_SESSION = `
+  mutation CreatePublicSession {
+    createPublicAiPlannerSession {
+      sessionId
+      flow
+    }
+  }
+`;
+
+// Shared frame selection so the authed and public subscriptions stay identical.
+const FRAME_FIELDS = `
+  textDelta
+  done
+  planReady
+  suggestions
+  brief {
+    goal brand budgetGbp geography audience channels formats clashCode
+    dates { start end }
+  }
+  plan {
+    budgetGbp rationale
+    locations { frameId label format lat lng impacts costGbp }
+    broadcastRegions { brand buyingAreaId duration impacts costGbp polylines }
+  }
+`;
+
 const AI_PLANNER_SUBSCRIPTION = `
   subscription AiPlanner($input: AiPlannerInput!) {
-    aiPlanner(input: $input) {
-      textDelta
-      done
-      planReady
-      suggestions
-      brief {
-        goal brand budgetGbp geography audience channels formats
-        dates { start end }
-      }
-      plan {
-        budgetGbp rationale
-        locations { frameId label format lat lng impacts costGbp }
-        broadcastRegions { brand buyingAreaId duration impacts costGbp }
-      }
-    }
+    aiPlanner(input: $input) {${FRAME_FIELDS}}
+  }
+`;
+
+// Public (unauthed) counterpart — same frame shape, streamed over a tokenless WS connection.
+const PUBLIC_AI_PLANNER_SUBSCRIPTION = `
+  subscription PublicAiPlanner($input: AiPlannerInput!) {
+    publicAiPlanner(input: $input) {${FRAME_FIELDS}}
   }
 `;
 
@@ -50,6 +71,7 @@ function generateTurnId() {
 }
 
 export default function Home() {
+  const [publicMode, setPublicMode] = useState(false);
   const [gigyaToken, setGigyaToken] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -57,6 +79,10 @@ export default function Home() {
   const [streaming, setStreaming] = useState(false);
   const [frames, setFrames] = useState<FrameLog[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  // Public mode needs no token; authed mode requires one before anything can be sent.
+  const canSend = publicMode || !!gigyaToken;
 
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const framesBottomRef = useRef<HTMLDivElement>(null);
@@ -109,7 +135,8 @@ export default function Home() {
     if (wsClientRef.current) wsClientRef.current.dispose();
     const client = createClient({
       url: GQL_WS,
-      connectionParams: { Authorization: `Bearer ${gigyaToken}` },
+      // Public endpoints accept tokenless connections (WebsocketInterceptor); authed ones need the bearer.
+      ...(publicMode ? {} : { connectionParams: { Authorization: `Bearer ${gigyaToken}` } }),
     });
     wsClientRef.current = client;
     return client;
@@ -120,17 +147,20 @@ export default function Home() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${gigyaToken}`,
+        ...(publicMode ? {} : { Authorization: `Bearer ${gigyaToken}` }),
       },
-      body: JSON.stringify({ query: CREATE_SESSION, variables: { input: {} } }),
+      body: JSON.stringify({ query: publicMode ? CREATE_PUBLIC_SESSION : CREATE_SESSION }),
     });
     const data = await res.json();
     if (data.errors) throw new Error(data.errors[0].message);
-    return data.data.createAiPlannerSession.sessionId as string;
+    const session = publicMode
+      ? data.data.createPublicAiPlannerSession
+      : data.data.createAiPlannerSession;
+    return session.sessionId as string;
   }
 
   async function sendMessage() {
-    if (!input.trim() || streaming || !gigyaToken) return;
+    if (!input.trim() || streaming || !canSend) return;
     setError(null);
     const userMessage = input.trim();
     setInput("");
@@ -158,12 +188,13 @@ export default function Home() {
 
     const unsub = client.subscribe(
       {
-        query: AI_PLANNER_SUBSCRIPTION,
+        query: publicMode ? PUBLIC_AI_PLANNER_SUBSCRIPTION : AI_PLANNER_SUBSCRIPTION,
         variables: { input: { sessionId: sid, message: userMessage, turnId } },
       },
       {
         next(data) {
-          const frame = (data.data as { aiPlanner: Record<string, unknown> }).aiPlanner;
+          const payload = data.data as Record<string, Record<string, unknown>>;
+          const frame = payload.aiPlanner ?? payload.publicAiPlanner;
           setFrames((prev) => [
             ...prev,
             { ts: new Date().toISOString(), frame },
@@ -231,17 +262,56 @@ export default function Home() {
     setStreaming(false);
   }
 
+  // Session IDs are flow-specific (AUTHED vs UNAUTHED), so switching modes must start a fresh session.
+  function toggleMode() {
+    resetSession();
+    setPublicMode((prev) => !prev);
+  }
+
+  // Copy the frame log exactly as rendered: each frame's timestamp followed by its pretty-printed JSON.
+  async function copyFrames() {
+    if (frames.length === 0) return;
+    const text = frames
+      .map((f) => `${f.ts}\n${JSON.stringify(f.frame, null, 2)}`)
+      .join("\n\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (e) {
+      setError(`Copy failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
   return (
     <div className="flex flex-col h-screen bg-gray-900 text-gray-100 font-mono text-sm">
       {/* Header */}
       <div className="flex items-center gap-3 p-3 border-b border-gray-700 bg-gray-800">
-        <span className="text-gray-400 whitespace-nowrap text-xs">Gigya token</span>
-        <input
-          className="flex-1 bg-gray-700 rounded px-3 py-1.5 text-xs text-gray-200 outline-none focus:ring-1 focus:ring-blue-500"
-          placeholder="Paste Gigya token..."
-          value={gigyaToken}
-          onChange={(e) => setGigyaToken(e.target.value)}
-        />
+        <button
+          onClick={toggleMode}
+          disabled={streaming}
+          title="Toggle public (unauthed) AI planner endpoints"
+          className={`text-xs px-3 py-1.5 rounded whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed ${
+            publicMode ? "bg-purple-700 text-white" : "bg-gray-700 text-gray-300"
+          }`}
+        >
+          {publicMode ? "Public (unauthed)" : "Authed"}
+        </button>
+        {publicMode ? (
+          <span className="flex-1 text-xs text-gray-500 whitespace-nowrap">
+            No token — createPublicAiPlannerSession / publicAiPlanner
+          </span>
+        ) : (
+          <>
+            <span className="text-gray-400 whitespace-nowrap text-xs">Gigya token</span>
+            <input
+              className="flex-1 bg-gray-700 rounded px-3 py-1.5 text-xs text-gray-200 outline-none focus:ring-1 focus:ring-blue-500"
+              placeholder="Paste Gigya token..."
+              value={gigyaToken}
+              onChange={(e) => setGigyaToken(e.target.value)}
+            />
+          </>
+        )}
         {sessionId && (
           <span className="text-xs text-green-400 whitespace-nowrap">
             session: {sessionId.slice(0, 8)}…
@@ -287,15 +357,15 @@ export default function Home() {
           <div className="flex gap-2 p-3 border-t border-gray-700 bg-gray-800">
             <input
               className="flex-1 bg-gray-700 rounded px-3 py-2 outline-none focus:ring-1 focus:ring-blue-500"
-              placeholder={gigyaToken ? "Type a message…" : "Paste a Gigya token first"}
+              placeholder={canSend ? "Type a message…" : "Paste a Gigya token first"}
               value={input}
-              disabled={!gigyaToken || streaming}
+              disabled={!canSend || streaming}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
             />
             <button
               onClick={sendMessage}
-              disabled={!gigyaToken || !input.trim() || streaming}
+              disabled={!canSend || !input.trim() || streaming}
               className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {streaming ? "…" : "Send"}
@@ -307,12 +377,21 @@ export default function Home() {
         <div className="flex flex-col w-1/2">
           <div className="flex items-center justify-between px-3 py-2 text-xs text-gray-400 border-b border-gray-700 bg-gray-800">
             <span>Frame stream</span>
-            <button
-              onClick={() => setFrames([])}
-              className="hover:text-gray-200"
-            >
-              clear
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={copyFrames}
+                disabled={frames.length === 0}
+                className="hover:text-gray-200 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {copied ? "copied!" : "copy"}
+              </button>
+              <button
+                onClick={() => setFrames([])}
+                className="hover:text-gray-200"
+              >
+                clear
+              </button>
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {frames.length === 0 && (
